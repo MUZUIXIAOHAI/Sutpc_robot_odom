@@ -46,6 +46,9 @@ include_directories(
 add_executable(rplidartoADV src/rplidar_client.cpp)
 target_link_libraries(rplidartoADV ${catkin_LIBRARIES})
 
+add_executable(Sutpc_ros_odom src/Sutpc_ros_odom.cpp)
+target_link_libraries(Sutpc_ros_odom ${catkin_LIBRARIES})
+
 add_executable(slamtoADV src/slam_listener.cpp)
 target_link_libraries(slamtoADV ${catkin_LIBRARIES})
 

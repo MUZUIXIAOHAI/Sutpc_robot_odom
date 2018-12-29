@@ -3,6 +3,8 @@
 <!-- start message get -->
 <node  name="rplidartoADV"   pkg="adv_comm"  type="rplidartoADV"   output="screen">
 
+<node  name="Sutpc_ros_odom"  pkg="adv_comm" type="Sutpc_ros_odom" output="screen">
+
 </node>
 <!--node  name="lamp_msgs_send" pkg="adv_comm"  type="lamp_msgs_send" output="screen">
 <param name="server_port"    type="int"      value="9999"/>
