@@ -216,13 +216,13 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     float d = 0.1;//轮子直径
 
     //判断各轴移动方向
-    if (cmd_input->linear.x < 0) {
+    if (cmd_input->linear.y < 0) {
         dir_speed_temp |= 0x01<<2;
     }
     else{
         dir_speed_temp &= 0xfb;
     }
-    if (cmd_input->linear.y < 0) {
+    if (cmd_input->linear.x < 0) {
         dir_speed_temp |= 0x01<<1;
     }
     else{
@@ -236,12 +236,17 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     }
 
     //x,y轴速度为 V = n*100/2700 * (pi*d)  （此处n为10ms移动脉冲）
-    speed_x = abs(cmd_input->linear.x)/(M_PI*d)*27;
-    speed_y = abs(cmd_input->linear.y)/(M_PI*d)*27;
+    speed_y = fabs(cmd_input->linear.x)/(M_PI*d)*27.0;
+    speed_x = fabs(cmd_input->linear.y)/(M_PI*d)*27.0;
     //  speed_z =
+
 
     //给定到下发串口数据
     ss.dir_speed = dir_speed_temp;
+    ss.speed_x = speed_x;
+    ss.speed_y = speed_y;
+
+    ROS_INFO("about the x,y speed , x:%x ,y:%x ", ss.speed_x, ss.speed_y);
   
 }
 
@@ -263,6 +268,7 @@ void sp1operation()
     ss.Send_buff[8] = ss.speed_z%255;           //z轴速度低八位
     ss.Send_buff[9] = ss.dir_speed;             //各轴速度方向
     
+
     //发送控制数据帧
     write(ss.sp1.return_port(), ss.Send_buff, CONTROL_MOTOR_MSG_LENGTH);
     //发送完成后读取接收数据帧
@@ -306,7 +312,7 @@ void sp1operation()
                         ss.motor_speed_D = get_motor_speed(ss.rcv_buff_save1[i+8], ss.rcv_buff_save1[i+9]);
                         ss.Z_gyro_speed = ss.rcv_buff_save1[i+10]*256 + ss.rcv_buff_save1[i+11] - 32768;
                         //测试读取结果
-                        ROS_INFO("here are motors' status, A:%x  B:%x  C:%x  D:%x。", ss.motor_speed_A, ss.motor_speed_B, ss.motor_speed_C, ss.motor_speed_D);
+                        //ROS_INFO("here are motors' status, A:%x  B:%x  C:%x  D:%x.", ss.motor_speed_A, ss.motor_speed_B, ss.motor_speed_C, ss.motor_speed_D);
                         
                         ss.save_end1=0;
                     }

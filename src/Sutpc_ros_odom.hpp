@@ -39,7 +39,7 @@ void serial_port::open_port(int i)
     if(i==4)
         port_fd = open("/dev/ttyS4", O_RDWR | O_NOCTTY | O_NDELAY);
     if(i==11)
-        port_fd = open("/dev/ttyUSB2", O_RDWR | O_NOCTTY | O_NDELAY);
+        port_fd = open("/dev/ttyUSB1", O_RDWR | O_NOCTTY | O_NDELAY);
     
     if (port_fd == -1)
     {
@@ -76,8 +76,8 @@ void serial_port::set_port()
      //1bit停止位
      Opt.c_cflag &= ~CSTOPB;*/
     
-    cfsetispeed(&Opt,B19200);
-    cfsetospeed(&Opt,B19200);
+    cfsetispeed(&Opt,B115200);
+    cfsetospeed(&Opt,B115200);
     tcsetattr(port_fd,TCSANOW,&Opt);
 }
 
