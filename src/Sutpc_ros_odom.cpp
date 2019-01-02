@@ -153,9 +153,9 @@ int main(int argc, char **argv)
             //发送控制数据帧并接收采集数据帧
             sp1operation();
             //计算里程计
-            calculate_odom(odom);
+            //calculate_odom(odom);
             //发布里程计主题
-            odom_pub.publish(odom);
+            //odom_pub.publish(odom);
         }
         ros::spinOnce();
     }
@@ -284,7 +284,7 @@ void sp1operation()
             //从串口缓冲区中读取数据长度
             int s1_recv_len=read(ss.sp1.return_port(),ss.rcv_buff1,MAXSIZE);
             //从串口缓冲区中读取数据
-            for(i=0; i<s1_recv_len; i++ ){
+            for(int i=0; i<s1_recv_len; i++ ){
                 ss.rcv_buff_save1[ss.save_end1]=ss.rcv_buff1[i];
                 ss.save_end1++;
                 if(ss.save_end1>=MAXSIZE)
@@ -294,7 +294,7 @@ void sp1operation()
             if(ss.save_end1>=ADV_MSG_LENGTH)
             {
                 //
-                for(i=0;i<=ss.save_end1-ADV_MSG_LENGTH;i++)
+                for(int i=0;i<=ss.save_end1-ADV_MSG_LENGTH;i++)
                 {
                     //检测帧头
                     if((unsigned char)ss.rcv_buff_save1[i]==0xff&&(unsigned char)ss.rcv_buff_save1[i+1]==0xfe)

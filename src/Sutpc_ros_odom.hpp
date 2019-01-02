@@ -39,7 +39,7 @@ void serial_port::open_port(int i)
     if(i==4)
         port_fd = open("/dev/ttyS4", O_RDWR | O_NOCTTY | O_NDELAY);
     if(i==11)
-        port_fd = open("/dev/ttyUSB002", O_RDWR | O_NOCTTY | O_NDELAY);
+        port_fd = open("/dev/ttyUSB2", O_RDWR | O_NOCTTY | O_NDELAY);
     
     if (port_fd == -1)
     {
