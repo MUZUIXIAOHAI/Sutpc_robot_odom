@@ -108,6 +108,7 @@ send_status ss;
 void initial_all();
 //订阅速度主题后，驱动底盘运动
 void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input);
+void velCallback_motorspeed_test(const geometry_msgs::Twist::ConstPtr & cmd_input);
 //操作串口1 下发控制数据帧以及收取采集数据帧
 void sp1operation();
 
@@ -124,7 +125,8 @@ int main(int argc, char **argv)
   
     ros::NodeHandle node;
     //订阅速度主题
-    ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed);
+//    ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed);
+    ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed_test);
     //发布里程计主题
     ros::Publisher odom_pub= node.advertise<nav_msgs::Odometry>("odom", 10); //定义要发布/odom主题
     nav_msgs::Odometry odom;//定义里程计对象
@@ -145,18 +147,18 @@ int main(int argc, char **argv)
     int last_time=clock()-10;
     while (ros::ok())
     {
-        cur_time=clock();
-        //间隔一百毫秒下发串口数据，数据下发频率为10HZ
-        if((int(cur_time - last_time)) >= 100000)
-        {
-            last_time = cur_time;
-            //发送控制数据帧并接收采集数据帧
-            sp1operation();
-            //计算里程计
-            //calculate_odom(odom);
-            //发布里程计主题
-            //odom_pub.publish(odom);
-        }
+//        cur_time=clock();
+//        //间隔一百毫秒下发串口数据，数据下发频率为10HZ
+//        if((int(cur_time - last_time)) >= 100000)
+//        {
+//            last_time = cur_time;
+//            //发送控制数据帧并接收采集数据帧
+//            sp1operation();
+//            //计算里程计
+//            //calculate_odom(odom);
+//            //发布里程计主题
+//            //odom_pub.publish(odom);
+//        }
         ros::spinOnce();
     }
     
@@ -197,6 +199,53 @@ void initial_all()
     ss.control_motor_mode = 0x01;
 //    //速度控制模式2，对每个电机进行单独速度闭环控制
 //    ss.control_motor_mode = 0x02;
+    
+}
+
+
+/*订阅速度主题，每接收到一次速度就执行一次
+ *输入：速度主题
+ *输出：发送串口相应数据帧
+ */
+void velCallback_motorspeed_test(const geometry_msgs::Twist::ConstPtr & cmd_input)
+{
+    
+    if (cmd_input->linear.y < 0) {
+        ss.speed_z = 50;
+    }
+    else{
+        ss.speed_z = 100;
+    }
+    if (cmd_input->angular.z < 0) {
+        ss.speed_z = 150;
+    }
+    else{
+        ss.speed_z = 250;
+    }
+    ss.speed_x = 0;
+    ss.speed_y = 0;
+    
+    //z轴方向,true为正
+    bool speed_z_dir = true;
+    
+    if (speed_z_dir == true) {
+        dir_speed_temp |= 0x01;
+    }
+    else{
+        dir_speed_temp &= 0xfe;
+    }
+    int cur_time=clock();
+    int last_time=clock()-10;
+    //发送运动控制帧
+    sp1operation();
+    //执行5秒钟
+    while((int(cur_time - last_time)) <= 3000000){
+        cur_time=clock();
+    }
+    //停止旋转
+    ss.speed_z = 0;
+    //发送运动控制帧
+    sp1operation();
     
 }
 
@@ -260,12 +309,12 @@ void sp1operation()
     ss.Send_buff[0] = 0xff;                     //帧头
     ss.Send_buff[1] = 0xfe;                     //帧头
     ss.Send_buff[2] = ss.control_motor_mode;    //速度控制模式
-    ss.Send_buff[3] = ss.speed_x/255;           //x轴速度高八位
-    ss.Send_buff[4] = ss.speed_x%255;           //x轴速度低八位
-    ss.Send_buff[5] = ss.speed_y/255;           //y轴速度高八位
-    ss.Send_buff[6] = ss.speed_y%255;           //y轴速度低八位
-    ss.Send_buff[7] = ss.speed_z/255;           //z轴速度高八位
-    ss.Send_buff[8] = ss.speed_z%255;           //z轴速度低八位
+    ss.Send_buff[3] = ss.speed_x/256;           //x轴速度高八位
+    ss.Send_buff[4] = ss.speed_x%256;           //x轴速度低八位
+    ss.Send_buff[5] = ss.speed_y/256;           //y轴速度高八位
+    ss.Send_buff[6] = ss.speed_y%256;           //y轴速度低八位
+    ss.Send_buff[7] = ss.speed_z/256;           //z轴速度高八位
+    ss.Send_buff[8] = ss.speed_z%256;           //z轴速度低八位
     ss.Send_buff[9] = ss.dir_speed;             //各轴速度方向
     
 
