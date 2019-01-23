@@ -213,8 +213,8 @@ void initial_all()
 
     //小车轮子直径设定
     ss.diameter = 0.1;
-    ss.chassis_a = 0.553/2;
-    ss.chassis_b = 0.552/2;
+    ss.chassis_a = 0.503/2;
+    ss.chassis_b = 0.452/2;
     //速度控制模式1，x,y,z轴速度给定模式
     ss.control_motor_mode = 0x01;
 //    //速度控制模式2，对每个电机进行单独速度闭环控制
