@@ -69,10 +69,10 @@ public:
     int last_odom_x;
     int last_odom_y;
     float cur_odom_th_z;
-    
-    
+
+
     //*****小车参数*****//
-    
+
     //小车轮子直径
     float diameter;
     //底盘长、宽;
@@ -119,6 +119,8 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input);
 void velCallback_motorspeed_test(const geometry_msgs::Twist::ConstPtr & cmd_input);
 //操作串口1 下发控制数据帧以及收取采集数据帧
 void sp1operation();
+//里程计计算函数
+int calculate_odom(nav_msgs::Odometry & odom);
 
 //*****工具函数*****//
 int16_t get_motor_speed(u_char speed, u_char dir);
@@ -168,9 +170,9 @@ int main(int argc, char **argv)
           //    ss.speed_z = 0;
           //  }
            //计算里程计
-           //calculate_odom(odom);
+           calculate_odom(odom);
            //发布里程计主题
-           //odom_pub.publish(odom);
+           odom_pub.publish(odom);
        }
         ros::spinOnce();
     }
@@ -208,7 +210,7 @@ void initial_all()
   ss.lamp_color=0x04;
   ss.lamp_time=0x20;
 
-    
+
     //小车轮子直径设定
     ss.diameter = 0.1;
     ss.chassis_a = 0.553/2;
@@ -417,32 +419,33 @@ int calculate_odom(nav_msgs::Odometry & odom)
     geometry_msgs::Quaternion odom_quat; //四元数变量
     static tf::TransformBroadcaster odom_broadcaster;//定义tf对象
     geometry_msgs::TransformStamped odom_trans;//创建一个tf发布需要使用的TransformStamped类型消息
-    
+
     int current_time=clock();
     float dt=float(float(current_time-ss.last_time)/CLOCKS_PER_SEC);   //与上次接受odom的时间差
-    
+
     //定义各电机的速度
     float velocity_A,velocity_B,velocity_C,velocity_D;
-    float velocity_dir_X,velocity_dir_Y;
-    
+    float velocity_dir_X,velocity_dir_Y,velocity_dir_w;
+
     //利用各个轮子编码器的值计算出各个轮子当前速度
     velocity_A = (ss.motor_speed_A_encoder * 100.0)/2700.0*M_PI*ss.diameter;
     velocity_B = (ss.motor_speed_B_encoder * 100.0)/2700.0*M_PI*ss.diameter;
     velocity_C = (ss.motor_speed_C_encoder * 100.0)/2700.0*M_PI*ss.diameter;
     velocity_D = (ss.motor_speed_D_encoder * 100.0)/2700.0*M_PI*ss.diameter;
-    
+
     velocity_dir_X = ((velocity_B + velocity_D) - (velocity_A + velocity_C))/4;
     velocity_dir_Y = (velocity_A + velocity_B + velocity_C + velocity_D)/4;
     velocity_dir_w = ((velocity_C + velocity_D) - (velocity_A + velocity_B))/(4*(ss.chassis_a + ss.chassis_b));
-    
-    
+
+
     ss.cur_odom_x += velocity_dir_X*dt;
     ss.cur_odom_y += velocity_dir_Y*dt;
-    ss.cur_odom_th += (velocity_dir_w*dt)%(M_PI*2);
-    
+    // ss.cur_odom_th += (velocity_dir_w*dt)%(M_PI*2);
+    ss.cur_odom_th += velocity_dir_w*dt;
+
     odom_quat = tf::createQuaternionMsgFromYaw(ss.cur_odom_th);//将偏航角转换成四元数
     ss.cur_odom_th_z = odom_quat.z;
-    
+
     //载入坐标（tf）变换时间戳
     odom_trans.header.stamp = ros::Time::now();
     //发布坐标变换的父子坐标系
@@ -465,13 +468,12 @@ int calculate_odom(nav_msgs::Odometry & odom)
     odom.pose.pose.position.y = ss.cur_odom_y;
     odom.pose.pose.position.z = 0.0;
     odom.pose.pose.orientation = odom_quat;
-    
+
     //载入线速度和角速度
     odom.twist.twist.linear.x = velocity_dir_X;
     odom.twist.twist.linear.y = velocity_dir_Y;
     odom.twist.twist.angular.z = velocity_dir_w;
-    
+
     ss.last_time=current_time;
     return 0;
 }
-
