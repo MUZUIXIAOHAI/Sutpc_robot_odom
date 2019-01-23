@@ -69,6 +69,14 @@ public:
     int last_odom_x;
     int last_odom_y;
     float cur_odom_th_z;
+    
+    
+    //*****小车参数*****//
+    
+    //小车轮子直径
+    float diameter;
+    //底盘长、宽;
+    float chassis_a,chassis_b;
 
     //*****下发数据*****//
 
@@ -86,10 +94,10 @@ public:
     //*****采集数据*****//
 
     //各电机的速度大小
-    int16_t motor_speed_A;
-    int16_t motor_speed_B;
-    int16_t motor_speed_C;
-    int16_t motor_speed_D;
+    int16_t motor_speed_A_encoder;
+    int16_t motor_speed_B_encoder;
+    int16_t motor_speed_C_encoder;
+    int16_t motor_speed_D_encoder;
     //各电机的速度方向 只有三种状态 1代表速度数据为正，0代表停止，2代表速度数据为负
     char motor_speed_A_dir;
     char motor_speed_B_dir;
@@ -200,6 +208,11 @@ void initial_all()
   ss.lamp_color=0x04;
   ss.lamp_time=0x20;
 
+    
+    //小车轮子直径设定
+    ss.diameter = 0.1;
+    ss.chassis_a = 0.553/2;
+    ss.chassis_b = 0.552/2;
     //速度控制模式1，x,y,z轴速度给定模式
     ss.control_motor_mode = 0x01;
 //    //速度控制模式2，对每个电机进行单独速度闭环控制
@@ -260,8 +273,6 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     //各轴速度方向,低三位分别代表各轴速度方向
     unsigned char dir_speed_temp;
 
-    float d = 0.1;//轮子直径
-
     //判断各轴移动方向
     if (cmd_input->linear.y < 0) {
         dir_speed_temp |= 0x01<<2;
@@ -283,8 +294,8 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     }
 
     //x,y轴速度为 V = n*100/2700 * (pi*d)  （此处n为10ms移动脉冲）
-    speed_y = fabs(cmd_input->linear.x)/(M_PI*d)*27.0;
-    speed_x = fabs(cmd_input->linear.y)/(M_PI*d)*27.0;
+    speed_y = fabs(cmd_input->linear.x)/(M_PI*ss.diameter)*27.0;
+    speed_x = fabs(cmd_input->linear.y)/(M_PI*ss.diameter)*27.0;
     //0.0127465为z轴转换系数
     speed_z = fabs(cmd_input->angular.z)/0.0127465;
 
@@ -353,13 +364,13 @@ void sp1operation()
                     if((unsigned char)ss.rcv_buff_save1[i]==0xff&&(unsigned char)ss.rcv_buff_save1[i+1]==0xfe)
                     {
                         //采集数据帧无bcc校验，直接读取数据
-                        ss.motor_speed_A = get_motor_speed(ss.rcv_buff_save1[i+2], ss.rcv_buff_save1[i+3]);
-                        ss.motor_speed_B = get_motor_speed(ss.rcv_buff_save1[i+4], ss.rcv_buff_save1[i+5]);
-                        ss.motor_speed_C = get_motor_speed(ss.rcv_buff_save1[i+6], ss.rcv_buff_save1[i+7]);
-                        ss.motor_speed_D = get_motor_speed(ss.rcv_buff_save1[i+8], ss.rcv_buff_save1[i+9]);
+                        ss.motor_speed_A_encoder = get_motor_speed(ss.rcv_buff_save1[i+2], ss.rcv_buff_save1[i+3]);
+                        ss.motor_speed_B_encoder = get_motor_speed(ss.rcv_buff_save1[i+4], ss.rcv_buff_save1[i+5]);
+                        ss.motor_speed_C_encoder = get_motor_speed(ss.rcv_buff_save1[i+6], ss.rcv_buff_save1[i+7]);
+                        ss.motor_speed_D_encoder = get_motor_speed(ss.rcv_buff_save1[i+8], ss.rcv_buff_save1[i+9]);
                         ss.Z_gyro_speed = ss.rcv_buff_save1[i+10]*256 + ss.rcv_buff_save1[i+11] - 32768;
                         //测试读取结果
-                        ROS_INFO("here are motors' status, A:%d  B:%d  C:%d  D:%d.", ss.motor_speed_A, ss.motor_speed_B, ss.motor_speed_C, ss.motor_speed_D);
+                        ROS_INFO("here are motors' status, A:%d  B:%d  C:%d  D:%d.", ss.motor_speed_A_encoder, ss.motor_speed_B_encoder, ss.motor_speed_C_encoder, ss.motor_speed_D_encoder);
                         ROS_INFO("here is the z_speed : %d ", ss.Z_gyro_speed);
 
                         ss.save_end1=0;
@@ -396,3 +407,71 @@ int16_t get_motor_speed(u_char speed, u_char dir){
 
     return output_speed;
 }
+
+/*计算里程计函数
+ *输入：里程计主题
+ *输出：里程计主题
+ */
+int calculate_odom(nav_msgs::Odometry & odom)
+{
+    geometry_msgs::Quaternion odom_quat; //四元数变量
+    static tf::TransformBroadcaster odom_broadcaster;//定义tf对象
+    geometry_msgs::TransformStamped odom_trans;//创建一个tf发布需要使用的TransformStamped类型消息
+    
+    int current_time=clock();
+    float dt=float(float(current_time-ss.last_time)/CLOCKS_PER_SEC);   //与上次接受odom的时间差
+    
+    //定义各电机的速度
+    float velocity_A,velocity_B,velocity_C,velocity_D;
+    float velocity_dir_X,velocity_dir_Y;
+    
+    //利用各个轮子编码器的值计算出各个轮子当前速度
+    velocity_A = (ss.motor_speed_A_encoder * 100.0)/2700.0*M_PI*ss.diameter;
+    velocity_B = (ss.motor_speed_B_encoder * 100.0)/2700.0*M_PI*ss.diameter;
+    velocity_C = (ss.motor_speed_C_encoder * 100.0)/2700.0*M_PI*ss.diameter;
+    velocity_D = (ss.motor_speed_D_encoder * 100.0)/2700.0*M_PI*ss.diameter;
+    
+    velocity_dir_X = ((velocity_B + velocity_D) - (velocity_A + velocity_C))/4;
+    velocity_dir_Y = (velocity_A + velocity_B + velocity_C + velocity_D)/4;
+    velocity_dir_w = ((velocity_C + velocity_D) - (velocity_A + velocity_B))/(4*(ss.chassis_a + ss.chassis_b));
+    
+    
+    ss.cur_odom_x += velocity_dir_X*dt;
+    ss.cur_odom_y += velocity_dir_Y*dt;
+    ss.cur_odom_th += (velocity_dir_w*dt)%(M_PI*2);
+    
+    odom_quat = tf::createQuaternionMsgFromYaw(ss.cur_odom_th);//将偏航角转换成四元数
+    ss.cur_odom_th_z = odom_quat.z;
+    
+    //载入坐标（tf）变换时间戳
+    odom_trans.header.stamp = ros::Time::now();
+    //发布坐标变换的父子坐标系
+    odom_trans.header.frame_id = "odom";
+    odom_trans.child_frame_id = "base_footprint_wheel";
+    //tf位置数据：x,y,z,方向
+    odom_trans.transform.translation.x = ss.cur_odom_x;
+    odom_trans.transform.translation.y = ss.cur_odom_y;
+    odom_trans.transform.translation.z = 0.0;
+    odom_trans.transform.rotation = odom_quat;
+    //发布tf坐标变化
+    odom_broadcaster.sendTransform(odom_trans);
+    //载入里程计时间戳
+    odom.header.stamp = ros::Time::now();
+    //里程计的父子坐标系
+    odom.header.frame_id = "odom";
+    odom.child_frame_id = "base_footprint_wheel";
+    //里程计位置数据：x,y,z,方向
+    odom.pose.pose.position.x = ss.cur_odom_x;
+    odom.pose.pose.position.y = ss.cur_odom_y;
+    odom.pose.pose.position.z = 0.0;
+    odom.pose.pose.orientation = odom_quat;
+    
+    //载入线速度和角速度
+    odom.twist.twist.linear.x = velocity_dir_X;
+    odom.twist.twist.linear.y = velocity_dir_Y;
+    odom.twist.twist.angular.z = velocity_dir_w;
+    
+    ss.last_time=current_time;
+    return 0;
+}
+
