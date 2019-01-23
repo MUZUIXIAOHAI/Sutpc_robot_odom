@@ -38,11 +38,11 @@ public:
     serial_port sp3;
 
     char rcv_buff1[MAXSIZE];
-    char rcv_buff_save1[MAXSIZE];
-    
+    unsigned char rcv_buff_save1[MAXSIZE];
+
     char rcv_buff3[MAXSIZE];
     char rcv_buff_save3[MAXSIZE];
-    
+
     char lamp_color;
     char lamp_time;
     int save_end1;
@@ -50,7 +50,7 @@ public:
     double location[3];
     double speed[2];
     char ADVnum;
-    
+
     int left_enc;
     int right_enc;
     int last_left_enc;
@@ -59,19 +59,19 @@ public:
     float cur_odom_x;         //当前odom的x坐标
     float cur_odom_y;         //当前odom的y坐标
     float cur_odom_th;        //当前odom的角度
-    
+
     char ADVstatus;
     char speedflag;
     char powerstate;
-    
+
     int motor_flag;
     int TestOdemFlag;
     int last_odom_x;
     int last_odom_y;
     float cur_odom_th_z;
-  
+
     //*****下发数据*****//
-    
+
     //串口下发的速度给定量
     unsigned int speed_x;
     unsigned int speed_y;
@@ -82,9 +82,9 @@ public:
     unsigned char Send_buff[CONTROL_MOTOR_MSG_LENGTH];
     //速度控制模式
     char control_motor_mode;
-    
+
     //*****采集数据*****//
-    
+
     //各电机的速度大小
     int16_t motor_speed_A;
     int16_t motor_speed_B;
@@ -97,8 +97,8 @@ public:
     char motor_speed_D_dir;
     //Z轴陀螺仪数据
     int32_t Z_gyro_speed;
-    
-    
+
+
     fd_set rd1,rd3;
 };
 
@@ -115,6 +115,7 @@ void sp1operation();
 //*****工具函数*****//
 int16_t get_motor_speed(u_char speed, u_char dir);
 
+int last_time_1;
 
 int main(int argc, char **argv)
 {
@@ -122,11 +123,11 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "sutpc_odom_node");
     //初始化参数
     initial_all();
-  
+
     ros::NodeHandle node;
     //订阅速度主题
-//    ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed);
-    ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed_test);
+   ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed);
+    // ros::Subscriber sub2 = node.subscribe<geometry_msgs::Twist>("cmd_vel", 20, velCallback_motorspeed_test);
     //发布里程计主题
     ros::Publisher odom_pub= node.advertise<nav_msgs::Odometry>("odom", 10); //定义要发布/odom主题
     nav_msgs::Odometry odom;//定义里程计对象
@@ -141,29 +142,33 @@ int main(int argc, char **argv)
     {
       odom.pose.covariance[i] = covariance[i];;
     }
-    
+
     ros::Rate loop_rate(10);
     int cur_time=clock();
     int last_time=clock()-10;
     while (ros::ok())
     {
-//        cur_time=clock();
-//        //间隔一百毫秒下发串口数据，数据下发频率为10HZ
-//        if((int(cur_time - last_time)) >= 100000)
-//        {
-//            last_time = cur_time;
-//            //发送控制数据帧并接收采集数据帧
-//            sp1operation();
-//            //计算里程计
-//            //calculate_odom(odom);
-//            //发布里程计主题
-//            //odom_pub.publish(odom);
-//        }
+       cur_time=clock();
+       //间隔一百毫秒下发串口数据，数据下发频率为20HZ
+       if((int(cur_time - last_time)) >= 100000/2)
+       {
+           last_time = cur_time;
+           //发送控制数据帧并接收采集数据帧
+           sp1operation();
+          //  //测试Z轴转换系数
+          //  if ((int(cur_time - last_time_1)) >= 3000000) {
+          //    ss.speed_z = 0;
+          //  }
+           //计算里程计
+           //calculate_odom(odom);
+           //发布里程计主题
+           //odom_pub.publish(odom);
+       }
         ros::spinOnce();
     }
-    
+
     return 0;
-    
+
 }
 
 /*初始化odom初始参数
@@ -187,66 +192,59 @@ void initial_all()
   ss.cur_odom_x=0.0;         //当前odom的x坐标
   ss.cur_odom_y=0.0;         //当前odom的y坐标
   ss.cur_odom_th=0.0;        //当前odom的角度
-  
+
   ss.ADVnum=0x01;
   ss.ADVstatus=0x41;
   ss.speedflag=0x00;
   ss.powerstate=0x00;
   ss.lamp_color=0x04;
   ss.lamp_time=0x20;
-    
+
     //速度控制模式1，x,y,z轴速度给定模式
     ss.control_motor_mode = 0x01;
 //    //速度控制模式2，对每个电机进行单独速度闭环控制
 //    ss.control_motor_mode = 0x02;
-    
+
 }
 
 
 /*订阅速度主题，每接收到一次速度就执行一次
  *输入：速度主题
- *输出：发送串口相应数据帧
+ *输出：发送串口相应数据帧,测试Z轴转换系数
  */
 void velCallback_motorspeed_test(const geometry_msgs::Twist::ConstPtr & cmd_input)
 {
-    
-    if (cmd_input->linear.y < 0) {
+
+    if (cmd_input->linear.x < -0.4) {
+        ss.speed_z = 20;
+    }
+    else if (cmd_input->linear.x > 0.4){
         ss.speed_z = 50;
     }
-    else{
-        ss.speed_z = 100;
+    if (cmd_input->angular.z < -0.4) {
+        ss.speed_z = 70;
     }
-    if (cmd_input->angular.z < 0) {
-        ss.speed_z = 150;
+    else if (cmd_input->angular.z > 0.4) {
+        ss.speed_z = 120;
     }
-    else{
-        ss.speed_z = 250;
+    if (cmd_input->linear.x > -0.2 && cmd_input->linear.x <0.2){
+      if (cmd_input->angular.z > -0.2 && cmd_input->angular.z < 0.2)
+        ss.speed_z = 0;
     }
     ss.speed_x = 0;
     ss.speed_y = 0;
-    
+
     //z轴方向,true为正
     bool speed_z_dir = true;
-    
+
     if (speed_z_dir == true) {
-        dir_speed_temp |= 0x01;
+        ss.dir_speed |= 0x01;
     }
     else{
-        dir_speed_temp &= 0xfe;
+        ss.dir_speed &= 0xfe;
     }
-    int cur_time=clock();
-    int last_time=clock()-10;
-    //发送运动控制帧
-    sp1operation();
-    //执行5秒钟
-    while((int(cur_time - last_time)) <= 3000000){
-        cur_time=clock();
-    }
-    //停止旋转
-    ss.speed_z = 0;
-    //发送运动控制帧
-    sp1operation();
-    
+    last_time_1=clock();
+
 }
 
 /*订阅速度主题后，修改下发的全局速度参数
@@ -271,7 +269,7 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     else{
         dir_speed_temp &= 0xfb;
     }
-    if (cmd_input->linear.x < 0) {
+    if (cmd_input->linear.x > 0) {
         dir_speed_temp |= 0x01<<1;
     }
     else{
@@ -287,16 +285,16 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     //x,y轴速度为 V = n*100/2700 * (pi*d)  （此处n为10ms移动脉冲）
     speed_y = fabs(cmd_input->linear.x)/(M_PI*d)*27.0;
     speed_x = fabs(cmd_input->linear.y)/(M_PI*d)*27.0;
-    //  speed_z =
+    //0.0127465为z轴转换系数
+    speed_z = fabs(cmd_input->angular.z)/0.0127465;
 
 
     //给定到下发串口数据
     ss.dir_speed = dir_speed_temp;
     ss.speed_x = speed_x;
     ss.speed_y = speed_y;
+    ss.speed_z = speed_z;
 
-    ROS_INFO("about the x,y speed , x:%x ,y:%x ", ss.speed_x, ss.speed_y);
-  
 }
 
 /*串口发送底盘驱动控制帧，并接收采集数据帧
@@ -316,7 +314,7 @@ void sp1operation()
     ss.Send_buff[7] = ss.speed_z/256;           //z轴速度高八位
     ss.Send_buff[8] = ss.speed_z%256;           //z轴速度低八位
     ss.Send_buff[9] = ss.dir_speed;             //各轴速度方向
-    
+
 
     //发送控制数据帧
     write(ss.sp1.return_port(), ss.Send_buff, CONTROL_MOTOR_MSG_LENGTH);
@@ -361,8 +359,9 @@ void sp1operation()
                         ss.motor_speed_D = get_motor_speed(ss.rcv_buff_save1[i+8], ss.rcv_buff_save1[i+9]);
                         ss.Z_gyro_speed = ss.rcv_buff_save1[i+10]*256 + ss.rcv_buff_save1[i+11] - 32768;
                         //测试读取结果
-                        //ROS_INFO("here are motors' status, A:%x  B:%x  C:%x  D:%x.", ss.motor_speed_A, ss.motor_speed_B, ss.motor_speed_C, ss.motor_speed_D);
-                        
+                        ROS_INFO("here are motors' status, A:%d  B:%d  C:%d  D:%d.", ss.motor_speed_A, ss.motor_speed_B, ss.motor_speed_C, ss.motor_speed_D);
+                        ROS_INFO("here is the z_speed : %d ", ss.Z_gyro_speed);
+
                         ss.save_end1=0;
                     }
                 }
@@ -379,21 +378,21 @@ int16_t get_motor_speed(u_char speed, u_char dir){
     int16_t output_speed;
     //各电机的速度方向 只有三种状态 1代表速度数据为正，0代表停止，2代表速度数据为负
     switch (dir) {
-        case 1:
+        case 0:
             output_speed = speed;
             break;
-            
-        case 0:
+
+        case 1:
             output_speed = 0;
             break;
-            
+
         case 2:
             output_speed = -speed;
             break;
-            
+
         default:
             break;
     }
-    
+
     return output_speed;
 }

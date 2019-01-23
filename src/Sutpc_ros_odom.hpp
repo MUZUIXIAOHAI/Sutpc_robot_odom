@@ -39,8 +39,8 @@ void serial_port::open_port(int i)
     if(i==4)
         port_fd = open("/dev/ttyS4", O_RDWR | O_NOCTTY | O_NDELAY);
     if(i==11)
-        port_fd = open("/dev/ttyUSB1", O_RDWR | O_NOCTTY | O_NDELAY);
-    
+        port_fd = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
+
     if (port_fd == -1)
     {
         /*
@@ -56,18 +56,18 @@ void serial_port::open_port(int i)
 void serial_port::set_port()
 {
     struct  termios Opt;
-    
+
     if  ( tcgetattr( port_fd , &Opt)  !=  0 ) {
         perror("SetupSerial 1 :");
     }
-    
+
     Opt.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     Opt.c_oflag &= ~OPOST;
-    
+
     Opt.c_cflag |= CLOCAL | CREAD;
-    
+
     Opt.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    
+
     /*//8bit数据位
      Opt.c_cflag &= ~CSIZE;
      Opt.c_cflag |= CS8;
@@ -75,7 +75,7 @@ void serial_port::set_port()
      Opt.c_cflag &= ~PARENB;
      //1bit停止位
      Opt.c_cflag &= ~CSTOPB;*/
-    
+
     cfsetispeed(&Opt,B115200);
     cfsetospeed(&Opt,B115200);
     tcsetattr(port_fd,TCSANOW,&Opt);
