@@ -437,6 +437,10 @@ int calculate_odom(nav_msgs::Odometry & odom)
     velocity_dir_Y = (velocity_A + velocity_B + velocity_C + velocity_D)/4;
     velocity_dir_w = ((velocity_C + velocity_D) - (velocity_A + velocity_B))/(4*(ss.chassis_a + ss.chassis_b));
 
+    //速度修正系数，经过测量，与实际距离都偏小了
+    velocity_dir_X *= 1.05;
+    velocity_dir_Y *= 1.05;
+    velocity_dir_w *= 1.05;
 
     ss.cur_odom_x += velocity_dir_X*dt;
     ss.cur_odom_y += velocity_dir_Y*dt;
