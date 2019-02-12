@@ -10,16 +10,16 @@
 acc_lim_x: 1.0
 
 # The y acceleration limit of the robot in meters/sec^2 (double, default: 2.5)
-acc_lim_y: 0.0
+acc_lim_y: 1.0
 
 # The rotational acceleration limit of the robot in radians/sec^2 (double, default: 3.2)
 acc_lim_theta: 3.0
 
 # The maximum forward velocity allowed for the base in meters/sec (double, default: 0.5)
-max_vel_x: 0.5
+max_vel_x: 0.3
 
 # The minimum forward velocity allowed for the base in meters/sec. It is useful to specify this to guarantee that velocity commands sent to a mobile base are high enough to allow the base to overcome friction. (double, default: 0.1)
-min_vel_x: 0.05
+min_vel_x: -0.3
 
 # The maximum rotational velocity allowed for the base in radians/sec (double, default: 1.0)
 max_vel_theta: 0.4

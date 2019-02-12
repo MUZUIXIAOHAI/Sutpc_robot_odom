@@ -58,7 +58,7 @@ public:
     int last_time;
     float cur_odom_x;         //当前odom的x坐标
     float cur_odom_y;         //当前odom的y坐标
-    float cur_odom_th;        //当前odom的角度
+    double cur_odom_th;        //当前odom的角度
 
     char ADVstatus;
     char speedflag;
@@ -276,17 +276,17 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     unsigned char dir_speed_temp;
 
     //判断各轴移动方向
-    if (cmd_input->linear.y < 0) {
-        dir_speed_temp |= 0x01<<2;
-    }
-    else{
-        dir_speed_temp &= 0xfb;
-    }
-    if (cmd_input->linear.x > 0) {
+    if (cmd_input->linear.y > 0) {
         dir_speed_temp |= 0x01<<1;
     }
     else{
         dir_speed_temp &= 0xfd;
+    }
+    if (cmd_input->linear.x > 0) {
+        dir_speed_temp |= 0x01<<2;
+    }
+    else{
+        dir_speed_temp &= 0xfb;
     }
     if (cmd_input->angular.z < 0) {
         dir_speed_temp |= 0x01;
@@ -296,8 +296,8 @@ void velCallback_motorspeed(const geometry_msgs::Twist::ConstPtr & cmd_input)
     }
 
     //x,y轴速度为 V = n*100/2700 * (pi*d)  （此处n为10ms移动脉冲）
-    speed_y = fabs(cmd_input->linear.x)/(M_PI*ss.diameter)*27.0;
-    speed_x = fabs(cmd_input->linear.y)/(M_PI*ss.diameter)*27.0;
+    speed_x = fabs(cmd_input->linear.x)/(M_PI*ss.diameter)*27.0;
+    speed_y = fabs(cmd_input->linear.y)/(M_PI*ss.diameter)*27.0;
     //0.0127465为z轴转换系数
     speed_z = fabs(cmd_input->angular.z)/0.0127465;
 
@@ -372,8 +372,8 @@ void sp1operation()
                         ss.motor_speed_D_encoder = get_motor_speed(ss.rcv_buff_save1[i+8], ss.rcv_buff_save1[i+9]);
                         ss.Z_gyro_speed = ss.rcv_buff_save1[i+10]*256 + ss.rcv_buff_save1[i+11] - 32768;
                         //测试读取结果
-                        ROS_INFO("here are motors' status, A:%d  B:%d  C:%d  D:%d.", ss.motor_speed_A_encoder, ss.motor_speed_B_encoder, ss.motor_speed_C_encoder, ss.motor_speed_D_encoder);
-                        ROS_INFO("here is the z_speed : %d ", ss.Z_gyro_speed);
+                        // ROS_INFO("here are motors' status, A:%d  B:%d  C:%d  D:%d.", ss.motor_speed_A_encoder, ss.motor_speed_B_encoder, ss.motor_speed_C_encoder, ss.motor_speed_D_encoder);
+                        // ROS_INFO("here is the z_speed : %d ", ss.Z_gyro_speed);
 
                         ss.save_end1=0;
                     }
@@ -422,6 +422,7 @@ int calculate_odom(nav_msgs::Odometry & odom)
 
     int current_time=clock();
     float dt=float(float(current_time-ss.last_time)/CLOCKS_PER_SEC);   //与上次接受odom的时间差
+    float dx,dy;
 
     //定义各电机的速度
     float velocity_A,velocity_B,velocity_C,velocity_D;
@@ -438,14 +439,23 @@ int calculate_odom(nav_msgs::Odometry & odom)
     velocity_dir_w = ((velocity_C + velocity_D) - (velocity_A + velocity_B))/(4*(ss.chassis_a + ss.chassis_b));
 
     //速度修正系数，经过测量，与实际距离都偏小了
-    velocity_dir_X *= 1.05;
-    velocity_dir_Y *= 1.05;
-    velocity_dir_w *= 1.05;
+    //乘上负号为了调整方向
+    velocity_dir_X *= -1.07;
+    velocity_dir_Y *= -1.07;
+    velocity_dir_w *= 1.22;
 
-    ss.cur_odom_x += velocity_dir_X*dt;
-    ss.cur_odom_y += velocity_dir_Y*dt;
-    // ss.cur_odom_th += (velocity_dir_w*dt)%(M_PI*2);
+    dx = velocity_dir_X*dt;
+    dy = velocity_dir_Y*dt;
+    ss.cur_odom_x += (cos(ss.cur_odom_th) * dx - sin(ss.cur_odom_th) * dy);
+    ss.cur_odom_y += (sin(ss.cur_odom_th) * dx + cos(ss.cur_odom_th) * dy);
+    // ss.cur_odom_th += ((double)velocity_dir_w*(double)dt)%(M_PI*2.0);
     ss.cur_odom_th += velocity_dir_w*dt;
+    while ( ss.cur_odom_th > M_PI*2.0  ) {
+      ss.cur_odom_th -= M_PI*2.0;
+    }
+    // while ( ss.cur_odom_th < -M_PI ) {
+    //   ss.cur_odom_th += M_PI*2.0;
+    // }
 
     odom_quat = tf::createQuaternionMsgFromYaw(ss.cur_odom_th);//将偏航角转换成四元数
     ss.cur_odom_th_z = odom_quat.z;
